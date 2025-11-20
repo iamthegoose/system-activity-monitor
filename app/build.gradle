@@ -1,0 +1,31 @@
+plugins {
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+def javaFxVersion = '22'
+
+dependencies {
+    implementation "org.openjfx:javafx-controls:${javaFxVersion}"
+    implementation "org.openjfx:javafx-graphics:${javaFxVersion}"
+    implementation "org.openjfx:javafx-base:${javaFxVersion}"
+
+    implementation "org.openjfx:javafx-controls:${javaFxVersion}:mac-aarch64"
+    implementation "org.openjfx:javafx-graphics:${javaFxVersion}:mac-aarch64"
+    implementation "org.openjfx:javafx-base:${javaFxVersion}:mac-aarch64"
+
+    implementation "com.google.code.gson:gson:2.10.1"
+    implementation 'com.github.kwhat:jnativehook:2.2.2'
+}
+
+application {
+    mainClass = 'ua.nychyk.activitymonitor.Main'
+
+    applicationDefaultJvmArgs = [
+            "--module-path", configurations.runtimeClasspath.asPath,
+            "--add-modules", "javafx.controls,javafx.graphics"
+    ]
+}
