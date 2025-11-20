@@ -9,24 +9,17 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import ua.nychyk.activitymonitor.factory.MonitorRepositoryFactory;
-import ua.nychyk.activitymonitor.monitors.ComputerUsageMonitor;
-import ua.nychyk.activitymonitor.monitors.CpuMonitor;
-import ua.nychyk.activitymonitor.monitors.MemoryMonitor;
-import ua.nychyk.activitymonitor.monitors.WindowMonitor;
-import ua.nychyk.activitymonitor.patterns.commands.Command;
-import ua.nychyk.activitymonitor.patterns.commands.GenerateDailyReportCommand;
-import ua.nychyk.activitymonitor.patterns.commands.GeneratePeriodicReportCommand;
-import ua.nychyk.activitymonitor.patterns.visitors.JSONReportVisitor;
-import ua.nychyk.activitymonitor.patterns.visitors.ReportVisitor;
-import ua.nychyk.activitymonitor.patterns.visitors.TextReportVisitor;
-import ua.nychyk.activitymonitor.monitors.Monitor;
-
-import ua.nychyk.activitymonitor.report.ReportService;
-import ua.nychyk.activitymonitor.report.ReportInvoker;
+import ua.nychyk.activitymonitor.monitors.*;
+import ua.nychyk.activitymonitor.patterns.commands.*;
+import ua.nychyk.activitymonitor.patterns.visitors.*;
+import ua.nychyk.activitymonitor.report.*;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+
+import com.github.kwhat.jnativehook.GlobalScreen;
+import com.github.kwhat.jnativehook.NativeHookException;
 
 public class ActivityMonitorController {
 
@@ -35,22 +28,37 @@ public class ActivityMonitorController {
     private final Label memoryLabel = new Label("Memory Usage: Loading...");
     private final Label windowLabel = new Label("Active Window: Loading...");
     private final Label usageLabel = new Label("Computer Usage: Loading...");
+    private final Label keyboardLabel = new Label("Keyboard Activity: Loading...");
+    private final Label mouseLabel = new Label("Mouse Activity: Loading...");
 
     // Монітори
     private final CpuMonitor cpuMonitor;
     private final MemoryMonitor memoryMonitor;
     private final WindowMonitor windowMonitor;
     private final ComputerUsageMonitor usageMonitor;
+    private final KeyboardMonitor keyboardMonitor;
+    private final MouseMonitor mouseMonitor;
 
     private boolean isMonitoring = false;
 
-    // Звітна логіка
+    // Звіти
     private final String dbFile;
     private final ReportService reportService;
 
     public ActivityMonitorController(Stage stage, String dbFile) {
         this.dbFile = dbFile;
         this.reportService = new ReportService(dbFile);
+
+        // -----------------------------
+        // 0. JNativeHook — логіка глобальних клавіш/миші
+        // -----------------------------
+        disableNativeHookLogging();
+
+        try {
+            GlobalScreen.registerNativeHook();
+        } catch (NativeHookException e) {
+            System.err.println("Failed to register native hook: " + e.getMessage());
+        }
 
         // -----------------------------
         // 1. Репозиторії
@@ -64,6 +72,9 @@ public class ActivityMonitorController {
         memoryMonitor = new MemoryMonitor(memoryLabel, repoFactory.getMemoryRepository());
         usageMonitor = new ComputerUsageMonitor(usageLabel, repoFactory.getComputerUsageRepository());
         windowMonitor = new WindowMonitor(windowLabel, repoFactory.getWindowRepository());
+
+        keyboardMonitor = new KeyboardMonitor(keyboardLabel);
+        mouseMonitor = new MouseMonitor(mouseLabel);
 
         // -----------------------------
         // 3. GUI
@@ -83,10 +94,12 @@ public class ActivityMonitorController {
                 memoryLabel,
                 windowLabel,
                 usageLabel,
+                keyboardLabel,
+                mouseLabel,
                 reportButton
         );
 
-        Scene scene = new Scene(root, 500, 280);
+        Scene scene = new Scene(root, 500, 350);
         stage.setScene(scene);
         stage.setTitle("Activity Monitor");
         stage.setOnCloseRequest(e -> stop());
@@ -98,18 +111,28 @@ public class ActivityMonitorController {
         startMonitoring();
     }
 
+    // Disable JNativeHook logs
+    private void disableNativeHookLogging() {
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(GlobalScreen.class.getPackage().getName());
+        logger.setLevel(java.util.logging.Level.OFF);
+        logger.setUseParentHandlers(false);
+    }
+
     private void startMonitoring() {
         if (isMonitoring) return;
         isMonitoring = true;
 
-        Thread thread = new Thread(() -> {
+        Thread loop = new Thread(() -> {
             while (isMonitoring) {
-                // updateWidget() сам оновлює Label
                 cpuMonitor.updateWidget();
                 memoryMonitor.updateWidget();
                 windowMonitor.updateWidget();
-                usageMonitor.checkActivity(true);  // тимчасово: завжди активний
+
+                usageMonitor.checkActivity(true);  // always active (як у твоїй Python версії)
                 usageMonitor.updateWidget();
+
+                keyboardMonitor.updateWidget();
+                mouseMonitor.updateWidget();
 
                 try {
                     Thread.sleep(1000);
@@ -117,8 +140,8 @@ public class ActivityMonitorController {
             }
         });
 
-        thread.setDaemon(true);
-        thread.start();
+        loop.setDaemon(true);
+        loop.start();
     }
 
     public void stop() {
@@ -131,7 +154,7 @@ public class ActivityMonitorController {
     }
 
     // ==========================================================
-    //            Вікно генерації звітів (GUI + логіка)
+    //                  REPORT WINDOW (GUI)
     // ==========================================================
 
     private void openReportWindow(Stage parentStage) {
@@ -144,28 +167,27 @@ public class ActivityMonitorController {
         main.setPadding(new Insets(10));
 
         // ------------------------------
-        // 1. Вибір режиму: By Day / By Period
+        // 1. By Day / By Period
         // ------------------------------
         ToggleGroup modeGroup = new ToggleGroup();
         RadioButton byDayRadio = new RadioButton("By Day");
         RadioButton byPeriodRadio = new RadioButton("By Period");
+
         byDayRadio.setToggleGroup(modeGroup);
         byPeriodRadio.setToggleGroup(modeGroup);
         byDayRadio.setSelected(true);
 
         HBox modeBox = new HBox(10, byDayRadio, byPeriodRadio);
-        main.getChildren().addAll(new Label("Choose daily or periodic report:"), modeBox);
+        main.getChildren().addAll(new Label("Choose Daily or Periodic Report:"), modeBox);
 
         // ------------------------------
-        // 2. Поля для дат
+        // 2. Date Inputs
         // ------------------------------
-        // By Day
         HBox dayBox = new HBox(10);
         Label dayLabel = new Label("Date (YYYY-MM-DD):");
         TextField dayField = new TextField();
         dayBox.getChildren().addAll(dayLabel, dayField);
 
-        // By Period
         HBox periodBox = new HBox(10);
         Label startLabel = new Label("Start (YYYY-MM-DD):");
         TextField startField = new TextField();
@@ -173,44 +195,41 @@ public class ActivityMonitorController {
         TextField endField = new TextField();
         periodBox.getChildren().addAll(startLabel, startField, endLabel, endField);
 
-        main.getChildren().add(dayBox); // початково показуємо dayBox
+        main.getChildren().add(dayBox);
+
+        byDayRadio.setOnAction(e -> {
+            main.getChildren().remove(periodBox);
+            if (!main.getChildren().contains(dayBox)) main.getChildren().add(2, dayBox);
+        });
+
+        byPeriodRadio.setOnAction(e -> {
+            main.getChildren().remove(dayBox);
+            if (!main.getChildren().contains(periodBox)) main.getChildren().add(2, periodBox);
+        });
 
         // ------------------------------
-        // 3. Вибір типу звіту (report_type)
+        // 3. Report-Type
         // ------------------------------
         ToggleGroup reportTypeGroup = new ToggleGroup();
-
         VBox reportTypeBox = new VBox(5);
-        Label reportTypeLabel = new Label("Choose Type of Report:");
 
-        RadioButton r1 = new RadioButton("CPU Usage by Hours");
-        r1.setUserData(1);
-        RadioButton r2 = new RadioButton("Browser Usage Percentage");
-        r2.setUserData(2);
-        RadioButton r3 = new RadioButton("Memory Usage by Hours");
-        r3.setUserData(3);
-        RadioButton r4 = new RadioButton("Computer Uptime by Day(s)");
-        r4.setUserData(4);
-        RadioButton r5 = new RadioButton("Programs Used by Day(s)");
-        r5.setUserData(5);
-        RadioButton r6 = new RadioButton("Average CPU Usage by Days");
-        r6.setUserData(6);
-        RadioButton r7 = new RadioButton("Average Memory Usage by Days");
-        r7.setUserData(7);
+        RadioButton r1 = makeReportType("CPU Usage by Hours", 1, reportTypeGroup);
+        RadioButton r2 = makeReportType("Browser Usage Percentage", 2, reportTypeGroup);
+        RadioButton r3 = makeReportType("Memory Usage by Hours", 3, reportTypeGroup);
+        RadioButton r4 = makeReportType("Computer Uptime by Day(s)", 4, reportTypeGroup);
+        RadioButton r5 = makeReportType("Programs Used by Day(s)", 5, reportTypeGroup);
+        RadioButton r6 = makeReportType("Average CPU Usage by Days", 6, reportTypeGroup);
+        RadioButton r7 = makeReportType("Average Memory Usage by Days", 7, reportTypeGroup);
 
-        r1.setToggleGroup(reportTypeGroup);
-        r2.setToggleGroup(reportTypeGroup);
-        r3.setToggleGroup(reportTypeGroup);
-        r4.setToggleGroup(reportTypeGroup);
-        r5.setToggleGroup(reportTypeGroup);
-        r6.setToggleGroup(reportTypeGroup);
-        r7.setToggleGroup(reportTypeGroup);
+        reportTypeBox.getChildren().addAll(
+                new Label("Choose Type of Report:"),
+                r1, r2, r3, r4, r5, r6, r7
+        );
 
-        reportTypeBox.getChildren().addAll(reportTypeLabel, r1, r2, r3, r4, r5, r6, r7);
         main.getChildren().add(reportTypeBox);
 
         // ------------------------------
-        // 4. Вибір формату (Text / JSON)
+        // 4. Format
         // ------------------------------
         ToggleGroup formatGroup = new ToggleGroup();
         RadioButton textFormat = new RadioButton("Text");
@@ -220,134 +239,109 @@ public class ActivityMonitorController {
         textFormat.setSelected(true);
 
         VBox formatBox = new VBox(5,
-                new Label("Choose Report Format:"),
-                textFormat,
-                jsonFormat
+                new Label("Choose Format:"),
+                textFormat, jsonFormat
         );
         main.getChildren().add(formatBox);
 
         // ------------------------------
-        // 5. Error label
+        // 5. Error Label
         // ------------------------------
         Label errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: red;");
         main.getChildren().add(errorLabel);
 
         // ------------------------------
-        // 6. Перемикання режимів
-        // ------------------------------
-        byDayRadio.setOnAction(e -> {
-            main.getChildren().remove(periodBox);
-            if (!main.getChildren().contains(dayBox)) {
-                main.getChildren().add(2, dayBox); // приблизно після modeBox
-            }
-        });
-
-        byPeriodRadio.setOnAction(e -> {
-            main.getChildren().remove(dayBox);
-            if (!main.getChildren().contains(periodBox)) {
-                main.getChildren().add(2, periodBox);
-            }
-        });
-
-        // ------------------------------
-        // 7. Кнопка Submit
+        // 6. Submit
         // ------------------------------
         Button submitButton = new Button("Submit");
         submitButton.setOnAction(e -> {
             boolean byDay = modeGroup.getSelectedToggle() == byDayRadio;
+
             String day = dayField.getText().trim();
             String start = startField.getText().trim();
             String end = endField.getText().trim();
 
-            Integer reportType = null;
-            if (reportTypeGroup.getSelectedToggle() != null) {
-                reportType = (Integer) reportTypeGroup.getSelectedToggle().getUserData();
-            }
+            Integer type = reportTypeGroup.getSelectedToggle() == null
+                    ? null
+                    : (Integer) reportTypeGroup.getSelectedToggle().getUserData();
 
-            String format = formatGroup.getSelectedToggle() == textFormat ? "Text" : "JSON";
+            String fmt = textFormat.isSelected() ? "Text" : "JSON";
 
-            String err = validateReportInput(byDay, day, start, end, reportType);
+            String err = validateReportInput(byDay, day, start, end, type);
             if (err != null) {
                 errorLabel.setText(err);
                 return;
             }
 
-            Object result = generateReport(byDay, day, start, end, reportType, format);
-            showReportResult(dialog, result, format);
+            Object result = generateReport(byDay, day, start, end, type, fmt);
+            showReportResult(dialog, result, fmt);
         });
 
         main.getChildren().add(submitButton);
 
-        Scene dialogScene = new Scene(main, 520, 450);
+        Scene dialogScene = new Scene(main, 520, 460);
         dialog.setScene(dialogScene);
         dialog.show();
     }
 
+    private RadioButton makeReportType(String text, int type, ToggleGroup group) {
+        RadioButton btn = new RadioButton(text);
+        btn.setUserData(type);
+        btn.setToggleGroup(group);
+        return btn;
+    }
+
     // ==========================================================
-    //                    Логіка звітів
+    //                     REPORT LOGIC
     // ==========================================================
 
     private String validateReportInput(
-            boolean byDay,
-            String day,
-            String start,
-            String end,
-            Integer reportType
+            boolean byDay, String day, String start, String end, Integer type
     ) {
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         LocalDate now = LocalDate.now();
 
-        if (reportType == null) {
-            return "Please select a report type.";
-        }
+        if (type == null) return "Please select a report type.";
 
         if (byDay) {
             if (day.isEmpty()) return "Date is required.";
-            LocalDate d;
-            try {
-                d = LocalDate.parse(day, fmt);
-            } catch (DateTimeParseException e) {
-                return "Date must be in format YYYY-MM-DD.";
-            }
-            if (d.isAfter(now)) return "Date cannot be in the future.";
-        } else {
-            if (start.isEmpty() || end.isEmpty()) {
-                return "Start and end dates are required.";
-            }
 
-            LocalDate s, e;
             try {
-                s = LocalDate.parse(start, fmt);
-                e = LocalDate.parse(end, fmt);
+                LocalDate d = LocalDate.parse(day, fmt);
+                if (d.isAfter(now)) return "Date cannot be in the future.";
             } catch (DateTimeParseException ex) {
-                return "Dates must be in format YYYY-MM-DD.";
+                return "Invalid date format.";
             }
+        } else {
+            if (start.isEmpty() || end.isEmpty()) return "Start and end dates required.";
 
-            if (s.isEqual(e)) return "Start and end date cannot be the same.";
-            if (s.isAfter(e)) return "Start date cannot be later than end date.";
-            if (e.isAfter(now)) return "End date cannot be in the future.";
+            try {
+                LocalDate s = LocalDate.parse(start, fmt);
+                LocalDate e = LocalDate.parse(end, fmt);
+
+                if (s.isAfter(e)) return "Start cannot be after end.";
+                if (e.isAfter(now)) return "End cannot be in the future.";
+                if (s.isEqual(e)) return "Start and end cannot be equal.";
+
+            } catch (DateTimeParseException ex) {
+                return "Invalid date format.";
+            }
         }
 
-        return null; // все ок
+        return null;
     }
 
     private Object generateReport(
-            boolean byDay,
-            String day,
-            String start,
-            String end,
-            int reportType,
-            String format
+            boolean byDay, String day, String start, String end, int type, String format
     ) {
         ReportInvoker invoker = new ReportInvoker();
         Command cmd;
 
-        if (byDay) {
-            cmd = new GenerateDailyReportCommand(reportService, day, reportType);
-        } else {
-            cmd = new GeneratePeriodicReportCommand(reportService, start, end, reportType);
-        }
+        if (byDay)
+            cmd = new GenerateDailyReportCommand(reportService, day, type);
+        else
+            cmd = new GeneratePeriodicReportCommand(reportService, start, end, type);
 
         invoker.setCommand(cmd);
 
@@ -367,21 +361,16 @@ public class ActivityMonitorController {
         VBox root = new VBox(10);
         root.setPadding(new Insets(10));
 
-        Label title = new Label("Report Result (" + format + "):");
-        TextArea area = new TextArea();
+        root.getChildren().add(new Label("Report Result (" + format + "):"));
+
+        TextArea area = new TextArea(result == null ? "No data" : result.toString());
         area.setEditable(false);
         area.setWrapText(true);
 
-        if (result != null) {
-            area.setText(result.toString());
-        } else {
-            area.setText("No data or error generating report.");
-        }
+        Button close = new Button("Close");
+        close.setOnAction(e -> dialog.close());
 
-        Button closeBtn = new Button("Close");
-        closeBtn.setOnAction(e -> dialog.close());
-
-        root.getChildren().addAll(title, area, closeBtn);
+        root.getChildren().addAll(area, close);
 
         Scene scene = new Scene(root, 600, 400);
         dialog.setScene(scene);

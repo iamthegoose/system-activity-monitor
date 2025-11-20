@@ -39,7 +39,9 @@ public class KeyboardMonitor implements ActivityAwareMonitor, NativeKeyListener 
         Platform.runLater(() ->
                 guiLabel.setText("Keyboard Activity: " + (active ? "Active" : "Idle"))
         );
+        active = false; // RESET
     }
+
 
     @Override
     public void saveData() { }

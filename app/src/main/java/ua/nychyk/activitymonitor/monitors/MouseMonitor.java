@@ -35,7 +35,9 @@ public class MouseMonitor implements ActivityFlagMonitor, NativeMouseInputListen
         Platform.runLater(() ->
                 guiLabel.setText("Mouse Activity: " + (active ? "Active" : "Idle"))
         );
+        active = false; // RESET
     }
+
 
     @Override
     public void saveData() {
