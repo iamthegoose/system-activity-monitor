@@ -5,7 +5,9 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ProcessorRepository {
 
@@ -15,9 +17,6 @@ public class ProcessorRepository {
         this.db = db;
     }
 
-    // =====================================================
-    //   ЗБЕРЕЖЕННЯ ДАНИХ (викликається CpuMonitor)
-    // =====================================================
     public void saveCpuUsage(int dateId, String timestamp, double cpuUsage) {
         String sql = "INSERT INTO ProcessorUsage (date_id, timestamp, cpu_usage) VALUES (?, ?, ?)";
 
@@ -34,7 +33,6 @@ public class ProcessorRepository {
         }
     }
 
-    // Оверсімпліфайд метод, який викликає твій CpuMonitor
     public void saveCpuUsage(double cpuUsage) {
         try (Connection conn = db.getConnection()) {
 
@@ -52,34 +50,32 @@ public class ProcessorRepository {
         }
     }
 
-    // =====================================================
-    //   ВИКЛИКАЄ ReportService → getUsageByDay(dateId)
-    // =====================================================
-    public List<Double> getUsageByDay(int dateId) {
-        List<Double> out = new ArrayList<>();
+    public List<Map<String, Object>> getUsageByDay(int dateId) {
+        List<Map<String, Object>> out = new ArrayList<>();
 
-        String sql = "SELECT cpu_usage FROM ProcessorUsage WHERE date_id = ? ORDER BY timestamp";
+        String sql = "SELECT timestamp, cpu_usage FROM ProcessorUsage WHERE date_id = ? ORDER BY timestamp";
 
         try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+            PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, dateId);
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    out.add(rs.getDouble("cpu_usage"));
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("time", rs.getString("timestamp"));
+                    item.put("value", rs.getDouble("cpu_usage"));
+                    out.add(item);
                 }
             }
 
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
         return out;
     }
 
-    // =====================================================
-    //   AVERAGE (ReportService → type 6)
-    // =====================================================
     public double getAverageUsage(List<Integer> dateIds) {
         double sum = 0;
         int count = 0;
@@ -108,9 +104,6 @@ public class ProcessorRepository {
         return sum / count;
     }
 
-    // =====================================================
-    //   ДОПОМІЖНЕ
-    // =====================================================
     private int getOrCreateDateId(Connection conn, String date) throws SQLException {
 
         String select = "SELECT date_id FROM MonitoringDates WHERE date = ?";

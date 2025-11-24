@@ -30,7 +30,7 @@ public class ActivityMonitorController {
     private final Label keyboardLabel = new Label("Keyboard Activity: Loading...");
     private final Label mouseLabel = new Label("Mouse Activity: Loading...");
 
-    // Монітори
+    // Monitors
     private final CpuMonitor cpuMonitor;
     private final MemoryMonitor memoryMonitor;
     private final WindowMonitor windowMonitor;
@@ -40,69 +40,79 @@ public class ActivityMonitorController {
 
     private boolean isMonitoring = false;
 
-    // Звіти
+    // List of all monitors
+    private final java.util.List<Monitor> monitors = new java.util.ArrayList<>();
+
+    // Report Service
     private final String dbFile;
     private final ReportService reportService;
 
     public ActivityMonitorController(Stage stage, String dbFile) {
         this.dbFile = dbFile;
-        
-
 
         // -----------------------------
-        // 0. JNativeHook — логіка глобальних клавіш/миші
+        // 0. Turn off JNativeHook
         // -----------------------------
         disableNativeHookLogging();
 
-    // -----------------------------
-    // 1. Репозиторії
-    // -----------------------------
-    MonitorRepositoryFactory repoFactory = new MonitorRepositoryFactory(dbFile);
-    
-    // -----------------------------
-    // 2. Монітори
-    // -----------------------------
-    this.reportService = new ReportService(
-            repoFactory.getProcessorRepository(),
-            repoFactory.getMemoryRepository(),
-            repoFactory.getComputerUsageRepository(),
-            repoFactory.getWindowRepository(),
-            repoFactory.getMonitoringDaysRepository()
-    );
-    cpuMonitor = new CpuMonitor(cpuLabel, repoFactory.getProcessorRepository());
-    memoryMonitor = new MemoryMonitor(
-        memoryLabel,
-        repoFactory.getMemoryRepository(),
-        repoFactory.getMonitoringDaysRepository()
-    );
-
-    usageMonitor = new ComputerUsageMonitor(usageLabel, repoFactory.getComputerUsageRepository());
-    windowMonitor = new WindowMonitor(
-        windowLabel,
-        repoFactory.getWindowRepository(),
-        repoFactory.getMonitoringDaysRepository()
-    );
-
-
-    keyboardMonitor = new KeyboardMonitor(keyboardLabel);
-    mouseMonitor = new MouseMonitor(mouseLabel);
-
-    // -----------------------------
-    // 3. ТІЛЬКИ ТЕПЕР реєструємо HOOK-и
-    // -----------------------------
-    try {
-        GlobalScreen.registerNativeHook();
-
-        GlobalScreen.addNativeKeyListener(keyboardMonitor);
-        GlobalScreen.addNativeMouseListener(mouseMonitor);
-        GlobalScreen.addNativeMouseMotionListener(mouseMonitor);
-
-    } catch (NativeHookException e) {
-        System.err.println("Failed to register native hook: " + e.getMessage());
-    }
+        // -----------------------------
+        // 1. Repository Factory
+        // -----------------------------
+        MonitorRepositoryFactory repoFactory = new MonitorRepositoryFactory(dbFile);
 
         // -----------------------------
-        // 3. GUI
+        // 2. Report Service
+        // -----------------------------
+        this.reportService = new ReportService(
+                repoFactory.getProcessorRepository(),
+                repoFactory.getMemoryRepository(),
+                repoFactory.getComputerUsageRepository(),
+                repoFactory.getWindowRepository(),
+                repoFactory.getMonitoringDaysRepository()
+        );
+
+        // -----------------------------
+        // 3. Monitors
+        // -----------------------------
+        cpuMonitor = new CpuMonitor(cpuLabel, repoFactory.getProcessorRepository());
+        memoryMonitor = new MemoryMonitor(
+                memoryLabel,
+                repoFactory.getMemoryRepository(),
+                repoFactory.getMonitoringDaysRepository()
+        );
+
+        usageMonitor = new ComputerUsageMonitor(usageLabel, repoFactory.getComputerUsageRepository());
+        windowMonitor = new WindowMonitor(
+                windowLabel,
+                repoFactory.getWindowRepository(),
+                repoFactory.getMonitoringDaysRepository()
+        );
+
+        keyboardMonitor = new KeyboardMonitor(keyboardLabel);
+        mouseMonitor = new MouseMonitor(mouseLabel);
+
+        monitors.add(cpuMonitor);
+        monitors.add(memoryMonitor);
+        monitors.add(usageMonitor);
+        monitors.add(windowMonitor);
+        monitors.add(keyboardMonitor);
+        monitors.add(mouseMonitor);
+
+        // -----------------------------
+        // 4. Hook JNativeHook for keyboard and mouse
+        // -----------------------------
+        try {
+            GlobalScreen.registerNativeHook();
+            GlobalScreen.addNativeKeyListener(keyboardMonitor);
+            GlobalScreen.addNativeMouseListener(mouseMonitor);
+            GlobalScreen.addNativeMouseMotionListener(mouseMonitor);
+
+        } catch (NativeHookException e) {
+            System.err.println("Failed to register native hook: " + e.getMessage());
+        }
+
+        // -----------------------------
+        // 5. GUI
         // -----------------------------
         VBox root = new VBox(10);
         root.setPadding(new Insets(10));
@@ -131,7 +141,7 @@ public class ActivityMonitorController {
         stage.show();
 
         // -----------------------------
-        // 4. Моніторинговий цикл
+        // 6. Monitoring Loop
         // -----------------------------
         startMonitoring();
     }
@@ -149,15 +159,18 @@ public class ActivityMonitorController {
 
         Thread loop = new Thread(() -> {
             while (isMonitoring) {
+
                 cpuMonitor.updateWidget();
                 memoryMonitor.updateWidget();
                 windowMonitor.updateWidget();
-
-                usageMonitor.checkActivity(true);  // always active (як у твоїй Python версії)
                 usageMonitor.updateWidget();
 
                 keyboardMonitor.updateWidget();
                 mouseMonitor.updateWidget();
+
+                windowMonitor.checkActivity(true);
+
+                usageMonitor.checkActivity(true); 
 
                 try {
                     Thread.sleep(1000);
@@ -179,7 +192,7 @@ public class ActivityMonitorController {
     }
 
     // ==========================================================
-    //                  REPORT WINDOW (GUI)
+    //                REPORT WINDOW (GUI)
     // ==========================================================
 
     private void openReportWindow(Stage parentStage) {
@@ -239,16 +252,14 @@ public class ActivityMonitorController {
         VBox reportTypeBox = new VBox(5);
 
         RadioButton r1 = makeReportType("CPU Usage by Hours", 1, reportTypeGroup);
-        RadioButton r2 = makeReportType("Browser Usage Percentage", 2, reportTypeGroup);
+        RadioButton r2 = makeReportType("Programs Usage Time", 2, reportTypeGroup);
         RadioButton r3 = makeReportType("Memory Usage by Hours", 3, reportTypeGroup);
         RadioButton r4 = makeReportType("Computer Uptime by Day(s)", 4, reportTypeGroup);
         RadioButton r5 = makeReportType("Programs Used by Day(s)", 5, reportTypeGroup);
-        RadioButton r6 = makeReportType("Average CPU Usage by Days", 6, reportTypeGroup);
-        RadioButton r7 = makeReportType("Average Memory Usage by Days", 7, reportTypeGroup);
 
         reportTypeBox.getChildren().addAll(
                 new Label("Choose Type of Report:"),
-                r1, r2, r3, r4, r5, r6, r7
+                r1, r2, r3, r4, r5
         );
 
         main.getChildren().add(reportTypeBox);
@@ -259,6 +270,7 @@ public class ActivityMonitorController {
         ToggleGroup formatGroup = new ToggleGroup();
         RadioButton textFormat = new RadioButton("Text");
         RadioButton jsonFormat = new RadioButton("JSON");
+
         textFormat.setToggleGroup(formatGroup);
         jsonFormat.setToggleGroup(formatGroup);
         textFormat.setSelected(true);
@@ -270,14 +282,34 @@ public class ActivityMonitorController {
         main.getChildren().add(formatBox);
 
         // ------------------------------
-        // 5. Error Label
+        // 5. FORCE SAVE BUTTON
+        // ------------------------------
+        Button forceSaveBtn = new Button("Force Save to DB");
+        forceSaveBtn.setOnAction(e -> {
+            try {
+                System.out.println(">>> Force Save CLICKED");
+                for (var m : monitors) {
+                    System.out.println("Saving: " + m.getClass().getSimpleName());
+                    m.saveData();
+                }
+                System.out.println(">>> Forced save to DB: OK");
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+
+        HBox forceSaveBox = new HBox(10, forceSaveBtn);
+        main.getChildren().add(forceSaveBox);
+
+        // ------------------------------
+        // 6. Error Label
         // ------------------------------
         Label errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: red;");
         main.getChildren().add(errorLabel);
 
         // ------------------------------
-        // 6. Submit
+        // 7. Submit Button
         // ------------------------------
         Button submitButton = new Button("Submit");
         submitButton.setOnAction(e -> {

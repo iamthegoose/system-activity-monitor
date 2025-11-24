@@ -22,7 +22,7 @@ public class CpuMonitor implements Monitor {
 
     @Override
     public void updateWidget() {
-        double cpu = osBean.getSystemCpuLoad() * 100.0;
+        double cpu = osBean.getCpuLoad() * 100.0;
 
         Platform.runLater(() ->
                 guiLabel.setText(String.format("CPU Usage: %.2f%%", cpu))
@@ -31,12 +31,12 @@ public class CpuMonitor implements Monitor {
 
     @Override
     public void saveData() {
-        double cpu = osBean.getSystemCpuLoad() * 100.0;
+        double cpu = osBean.getCpuLoad() * 100.0;
         repo.saveCpuUsage(cpu);
     }
 
     @Override
     public boolean getActivityFlag() {
-        return false; // CPU не фіксує активність
+        return false;
     }
 }

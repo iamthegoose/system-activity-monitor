@@ -8,8 +8,6 @@ import ua.nychyk.activitymonitor.repositories.MonitoringDaysRepository;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 
 public class WindowMonitor implements ActivityAwareMonitor {
 
@@ -17,8 +15,8 @@ public class WindowMonitor implements ActivityAwareMonitor {
     private final WindowRepository repo;
     private final MonitoringDaysRepository daysRepo;
 
-    private String currentWindow = "unknown";
-    private int activeSeconds = 0;
+    private String lastWindow = null;
+    private int secondsInCurrentWindow = 0;
 
     public WindowMonitor(Label guiLabel, WindowRepository repo, MonitoringDaysRepository daysRepo) {
         this.guiLabel = guiLabel;
@@ -28,53 +26,66 @@ public class WindowMonitor implements ActivityAwareMonitor {
 
     @Override
     public void updateWidget() {
-        String title = getActiveWindowTitle();
-        if (title == null || title.isBlank()) {
-            title = "Activity Monitor"; // FIX: показуємо замість unknown
+        String title = getActiveAppName();   // FIX → ім'я програми, не вкладки
+
+        if (title == null || title.isBlank())
+            return;
+
+        if (lastWindow != null && !lastWindow.equals(title)) {
+            saveWindow(lastWindow, secondsInCurrentWindow);
+            secondsInCurrentWindow = 0;
         }
-        currentWindow = title;
+
+        lastWindow = title;
 
         Platform.runLater(() ->
-                guiLabel.setText("Active Window: " + currentWindow)
+                guiLabel.setText("Active Window: " + lastWindow)
         );
     }
 
     @Override
     public void saveData() {
+        if (lastWindow != null && secondsInCurrentWindow > 0) {
+            saveWindow(lastWindow, secondsInCurrentWindow);
+        }
+        secondsInCurrentWindow = 0;
+    }
+
+    private void saveWindow(String windowName, int seconds) {
         try {
             String today = LocalDate.now().toString();
             int dateId = daysRepo.getOrAddDateId(today);
 
-            int windowId = repo.getOrAddWindowId(currentWindow);
+            String timeStr = toHHMMSS(seconds);
 
-            String timeStr = secondsToTime(activeSeconds);
-
+            int windowId = repo.getOrAddWindowId(windowName);
             repo.saveWindowUsage(dateId, windowId, timeStr);
+
         } catch (Exception e) {
             System.err.println("Failed to save window usage: " + e.getMessage());
         }
-
-        activeSeconds = 0;
     }
 
     @Override
     public boolean getActivityFlag() {
-        return false;
+        return true;
     }
 
     @Override
-    public void checkActivity(boolean isActiveNow) {
-        if (isActiveNow) {
-            activeSeconds++;
-        }
+    public void checkActivity(boolean active) {
+        secondsInCurrentWindow++;
     }
 
-    private String secondsToTime(int seconds) {
-        LocalTime t = LocalTime.ofSecondOfDay(seconds);
-        return t.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+    // ---------- HELPERS ----------
+
+    private String toHHMMSS(int sec) {
+        int h = sec / 3600;
+        int m = (sec % 3600) / 60;
+        int s = sec % 60;
+        return String.format("%02d:%02d:%02d", h, m, s);
     }
 
-    private String getActiveWindowTitle() {
+    private String getActiveAppName() {
         try {
             Process proc = Runtime.getRuntime().exec(
                     new String[]{
@@ -82,11 +93,9 @@ public class WindowMonitor implements ActivityAwareMonitor {
                             "-e",
                             "tell application \"System Events\"",
                             "-e",
-                            "set frontApp to first application process whose frontmost is true",
+                            "set frontApp to name of (first application process whose frontmost is true)",
                             "-e",
-                            "set winTitle to name of window 1 of frontApp",
-                            "-e",
-                            "return winTitle",
+                            "return frontApp",
                             "-e",
                             "end tell"
                     }
@@ -98,11 +107,11 @@ public class WindowMonitor implements ActivityAwareMonitor {
 
             String line = reader.readLine();
             proc.waitFor();
-
             return line;
 
         } catch (Exception e) {
-            return "Activity Monitor";
+            return null;
         }
     }
+    
 }

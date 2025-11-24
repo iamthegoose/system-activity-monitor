@@ -37,7 +37,6 @@ public class MemoryMonitor implements Monitor {
         MemoryInfo mem = getMacMemory();
         int usedMB = mem.usedMB;
 
-        // <-- Ось правильний виклик
         String today = java.time.LocalDate.now().toString();
         int dateId = daysRepo.getOrAddDateId(today);
 
@@ -46,14 +45,11 @@ public class MemoryMonitor implements Monitor {
         memoryRepo.insertMemoryUsage(dateId, timestamp, usedMB);
     }
 
-
     private String getCurrentHourTimestamp() {
-    java.time.LocalDateTime now = java.time.LocalDateTime.now();
-    now = now.withMinute(0).withSecond(0).withNano(0);
-    return now.toLocalTime().toString();
-}
-
-
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        now = now.withMinute(0).withSecond(0).withNano(0);
+        return now.toLocalTime().toString();
+    }
 
     @Override
     public boolean getActivityFlag() {
@@ -62,32 +58,25 @@ public class MemoryMonitor implements Monitor {
 
     private MemoryInfo getMacMemory() {
         try {
-
-            // 1) Get total physical memory
-            Process totalProc = Runtime.getRuntime().exec("sysctl -n hw.memsize");
-            BufferedReader tReader = new BufferedReader(new InputStreamReader(totalProc.getInputStream()));
-            long totalBytes = Long.parseLong(tReader.readLine().trim());
+            long totalBytes = runCommandAndParseLong("sysctl", "-n", "hw.memsize");
             long totalMB = totalBytes / (1024 * 1024);
 
-            // 2) Get VM stats
-            Process vm = Runtime.getRuntime().exec("vm_stat");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(vm.getInputStream()));
+            String vmOutput = runCommandAndGetOutput("vm_stat");
 
-            long pageSize = 16384; // 16 KB on macOS ARM
             long active = 0, wired = 0, compressed = 0;
+            long pageSize = 16384;
 
-            String line;
-            while ((line = reader.readLine()) != null) {
+            for (String line : vmOutput.split("\n")) {
                 line = line.trim();
 
                 if (line.startsWith("Pages active"))
-                    active = parseVmValue(line);
+                    active = extractVmNumber(line);
 
                 if (line.startsWith("Pages wired down"))
-                    wired = parseVmValue(line);
+                    wired = extractVmNumber(line);
 
                 if (line.startsWith("Pages occupied by compressor"))
-                    compressed = parseVmValue(line);
+                    compressed = extractVmNumber(line);
             }
 
             long usedBytes = (active + wired + compressed) * pageSize;
@@ -96,11 +85,45 @@ public class MemoryMonitor implements Monitor {
             return new MemoryInfo((int) usedMB, (int) totalMB);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new MemoryInfo(0, 1);
         }
     }
 
-    private long parseVmValue(String line) {
+    // ---- Generic ProcessBuilder caller ----
+
+    private long runCommandAndParseLong(String... cmd) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.redirectErrorStream(true);
+
+        Process proc = pb.start();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+
+        String line = reader.readLine();
+        proc.waitFor();
+
+        return Long.parseLong(line.trim());
+    }
+
+    private String runCommandAndGetOutput(String... cmd) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.redirectErrorStream(true);
+
+        Process proc = pb.start();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+
+        StringBuilder sb = new StringBuilder();
+        String line;
+
+        while ((line = reader.readLine()) != null) {
+            sb.append(line).append("\n");
+        }
+
+        proc.waitFor();
+        return sb.toString();
+    }
+
+    private long extractVmNumber(String line) {
         String num = line.replaceAll("[^0-9]", "");
         return Long.parseLong(num);
     }

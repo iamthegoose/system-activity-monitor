@@ -16,7 +16,6 @@ public class MouseMonitor implements ActivityFlagMonitor, NativeMouseInputListen
     private volatile int mouseX = 0;
     private volatile int mouseY = 0;
 
-    // утримувані кнопки
     private final Set<String> pressedButtons = ConcurrentHashMap.newKeySet();
 
     public MouseMonitor(Label guiLabel) {

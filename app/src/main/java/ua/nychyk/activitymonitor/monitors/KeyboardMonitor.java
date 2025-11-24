@@ -13,7 +13,6 @@ public class KeyboardMonitor implements ActivityAwareMonitor, NativeKeyListener 
 
     private final Label guiLabel;
 
-    // Замість lastKey → тепер набір натиснутих клавіш
     private final Set<String> pressedKeys = ConcurrentHashMap.newKeySet();
 
     public KeyboardMonitor(Label guiLabel) {

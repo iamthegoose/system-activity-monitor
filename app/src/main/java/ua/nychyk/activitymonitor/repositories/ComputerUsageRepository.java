@@ -13,9 +13,6 @@ public class ComputerUsageRepository {
         this.db = db;
     }
 
-    // -------------------------------------------------------------
-    //  ВАРІАНТ, ЯКИЙ ВИКОРИСТОВУЄ reportService — НЕ ЧІПАЄМО
-    // -------------------------------------------------------------
     public void saveComputerUsage(int dateId, String time) {
         String sql = "INSERT INTO ComputerUsage (date_id, time) VALUES (?, ?)";
 
@@ -31,24 +28,18 @@ public class ComputerUsageRepository {
         }
     }
 
-    // -------------------------------------------------------------
-    //  НОВИЙ МЕТОД, ЯКИЙ ВИКЛИКАЄ ComputerUsageMonitor
-    // -------------------------------------------------------------
     public void saveComputerUsage(int activeSeconds) {
         if (activeSeconds <= 0) return;
 
         try (Connection conn = db.getConnection()) {
 
-            // отримуємо date_id
             String today = LocalDate.now().toString();
             int dateId = getOrCreateDateId(conn, today);
 
-            // час збереження
             String time = LocalTime.now()
                     .withNano(0)
                     .format(DateTimeFormatter.ofPattern("HH:mm:ss"));
 
-            // вставка в таблицю
             String sql = "INSERT INTO ComputerUsage (date_id, time) VALUES (?, ?)";
 
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -62,9 +53,6 @@ public class ComputerUsageRepository {
         }
     }
 
-    // -------------------------------------------------------------
-    //  ДОПОМІЖНЕ: отримати або створити MonitoringDates.date_id
-    // -------------------------------------------------------------
     private int getOrCreateDateId(Connection conn, String date) throws SQLException {
 
         String select = "SELECT date_id FROM MonitoringDates WHERE date = ?";

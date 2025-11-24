@@ -19,58 +19,70 @@ public class DatabaseManager {
         return connect();
     }
 
-    // ============================================================
-    //                CREATE ALL TABLES (LIKE PYTHON VERSION)
-    // ============================================================
+
+    //                CREATE TABLES IF NOT EXISTS
+
     private void createTables() {
         try (Connection conn = connect();
              Statement stmt = conn.createStatement()) {
 
-            // CPU usage
+            // ---------------- MonitoringDates ----------------
             stmt.execute("""
-                CREATE TABLE IF NOT EXISTS processor_usage (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT,
-                    hour INTEGER,
-                    cpu REAL
+                CREATE TABLE IF NOT EXISTS MonitoringDates (
+                    date_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL UNIQUE
                 );
             """);
 
-            // Memory usage
+            // ---------------- ProcessorUsage ----------------
             stmt.execute("""
-                CREATE TABLE IF NOT EXISTS memory_usage (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT,
-                    hour INTEGER,
-                    memory REAL
+                CREATE TABLE IF NOT EXISTS ProcessorUsage (
+                    procusage_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date_id INTEGER NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    cpu_usage REAL NOT NULL,
+                    FOREIGN KEY (date_id) REFERENCES MonitoringDates(date_id)
                 );
             """);
 
-            // Computer activity
+            // ---------------- MemoryUsage ----------------
             stmt.execute("""
-                CREATE TABLE IF NOT EXISTS computer_usage (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT,
-                    hour INTEGER,
-                    active_seconds INTEGER
+                CREATE TABLE IF NOT EXISTS MemoryUsage (
+                    memusage_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date_id INTEGER NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    memory_usage_mb REAL NOT NULL,
+                    FOREIGN KEY (date_id) REFERENCES MonitoringDates(date_id)
                 );
             """);
 
-            // Window usage
+            // ---------------- ComputerUsage ----------------
             stmt.execute("""
-                CREATE TABLE IF NOT EXISTS window_usage (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT,
-                    hour INTEGER,
-                    window_name TEXT,
-                    seconds INTEGER
+                CREATE TABLE IF NOT EXISTS ComputerUsage (
+                    compusage_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date_id INTEGER NOT NULL,
+                    time TEXT NOT NULL,
+                    FOREIGN KEY (date_id) REFERENCES MonitoringDates(date_id)
                 );
             """);
 
-            // Monitoring days
+            // ---------------- Windows ----------------
             stmt.execute("""
-                CREATE TABLE IF NOT EXISTS monitoring_days (
-                    date TEXT PRIMARY KEY
+                CREATE TABLE IF NOT EXISTS Windows (
+                    window_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE
+                );
+            """);
+
+            // ---------------- WindowUsage ----------------
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS WindowUsage (
+                    winusage_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date_id INTEGER NOT NULL,
+                    window_id INTEGER NOT NULL,
+                    time TEXT NOT NULL,
+                    FOREIGN KEY (date_id) REFERENCES MonitoringDates(date_id),
+                    FOREIGN KEY (window_id) REFERENCES Windows(window_id)
                 );
             """);
 

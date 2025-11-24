@@ -2,7 +2,9 @@ package ua.nychyk.activitymonitor.repositories;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MemoryRepository {
 
@@ -12,9 +14,6 @@ public class MemoryRepository {
         this.db = db;
     }
 
-    // =====================================================
-    //  INSERT (викликає MemoryMonitor)
-    // =====================================================
     public void insertMemoryUsage(int dateId, String timestamp, int usedMb) {
 
         String sql = """
@@ -36,7 +35,6 @@ public class MemoryRepository {
         }
     }
 
-    // Спрощений варіант для monitor.saveData()
     public void insertMemoryUsage(int usedMb) {
         try (Connection conn = db.getConnection()) {
 
@@ -52,28 +50,25 @@ public class MemoryRepository {
         }
     }
 
-    // =====================================================
+
     //  ReportService → getUsageByDay(dateId)
-    // =====================================================
-    public List<Integer> getUsageByDay(int dateId) {
 
-        List<Integer> out = new ArrayList<>();
+    public List<Map<String, Object>> getUsageByDay(int dateId) {
+        List<Map<String, Object>> out = new ArrayList<>();
 
-        String sql = """
-            SELECT memory_usage_mb
-            FROM MemoryUsage
-            WHERE date_id = ?
-            ORDER BY timestamp
-        """;
+        String sql = "SELECT timestamp, memory_usage_mb FROM MemoryUsage WHERE date_id = ? ORDER BY timestamp";
 
         try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+            PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, dateId);
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    out.add(rs.getInt("memory_usage_mb"));
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("time", rs.getString("timestamp"));
+                    item.put("value", rs.getDouble("memory_usage_mb"));
+                    out.add(item);
                 }
             }
 
@@ -84,9 +79,7 @@ public class MemoryRepository {
         return out;
     }
 
-    // =====================================================
-    //  ReportService → type 7 (average memory)
-    // =====================================================
+
     public double getAverageUsage(List<Integer> dateIds) {
 
         double sum = 0;
@@ -116,9 +109,6 @@ public class MemoryRepository {
         return sum / count;
     }
 
-    // =====================================================
-    //  Допоміжне
-    // =====================================================
     private int getOrCreateDateId(Connection conn) throws SQLException {
         String today = java.time.LocalDate.now().toString();
 

@@ -12,11 +12,8 @@ public class MonitoringDaysRepository {
         this.db = db;
     }
 
-    /** Повернути date_id або створити нову дату */
     public int getOrAddDateId(String date) {
         try (Connection conn = db.getConnection()) {
-
-            // 1. Перевіряємо чи існує дата
             PreparedStatement check = conn.prepareStatement(
                     "SELECT date_id FROM MonitoringDates WHERE date = ?"
             );
@@ -25,7 +22,6 @@ public class MonitoringDaysRepository {
 
             if (rs.next()) return rs.getInt("date_id");
 
-            // 2. Додаємо нову дату
             PreparedStatement insert = conn.prepareStatement(
                     "INSERT INTO MonitoringDates (date) VALUES (?)",
                     Statement.RETURN_GENERATED_KEYS
@@ -43,7 +39,6 @@ public class MonitoringDaysRepository {
         return -1;
     }
 
-    /** Повернути date_id (без створення) */
     public Integer getDateId(String date) {
         try (Connection conn = db.getConnection()) {
 
@@ -62,7 +57,6 @@ public class MonitoringDaysRepository {
         return null;
     }
 
-    /** Діапазон дат -> список date_id */
     public List<Integer> getDateRange(String start, String end) {
         List<Integer> result = new ArrayList<>();
 
@@ -90,4 +84,24 @@ public class MonitoringDaysRepository {
 
         return result;
     }
+    public String getDateById(int dateId) {
+        String sql = "SELECT date FROM MonitoringDates WHERE date_id = ?";
+
+        try (Connection conn = db.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, dateId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getString("date");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
 }
