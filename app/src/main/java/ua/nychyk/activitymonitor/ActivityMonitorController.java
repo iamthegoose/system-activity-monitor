@@ -1,6 +1,5 @@
 package ua.nychyk.activitymonitor;
 
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -47,34 +46,60 @@ public class ActivityMonitorController {
 
     public ActivityMonitorController(Stage stage, String dbFile) {
         this.dbFile = dbFile;
-        this.reportService = new ReportService(dbFile);
+        
+
 
         // -----------------------------
         // 0. JNativeHook — логіка глобальних клавіш/миші
         // -----------------------------
         disableNativeHookLogging();
 
-        try {
-            GlobalScreen.registerNativeHook();
-        } catch (NativeHookException e) {
-            System.err.println("Failed to register native hook: " + e.getMessage());
-        }
+    // -----------------------------
+    // 1. Репозиторії
+    // -----------------------------
+    MonitorRepositoryFactory repoFactory = new MonitorRepositoryFactory(dbFile);
+    
+    // -----------------------------
+    // 2. Монітори
+    // -----------------------------
+    this.reportService = new ReportService(
+            repoFactory.getProcessorRepository(),
+            repoFactory.getMemoryRepository(),
+            repoFactory.getComputerUsageRepository(),
+            repoFactory.getWindowRepository(),
+            repoFactory.getMonitoringDaysRepository()
+    );
+    cpuMonitor = new CpuMonitor(cpuLabel, repoFactory.getProcessorRepository());
+    memoryMonitor = new MemoryMonitor(
+        memoryLabel,
+        repoFactory.getMemoryRepository(),
+        repoFactory.getMonitoringDaysRepository()
+    );
 
-        // -----------------------------
-        // 1. Репозиторії
-        // -----------------------------
-        MonitorRepositoryFactory repoFactory = new MonitorRepositoryFactory(dbFile);
+    usageMonitor = new ComputerUsageMonitor(usageLabel, repoFactory.getComputerUsageRepository());
+    windowMonitor = new WindowMonitor(
+        windowLabel,
+        repoFactory.getWindowRepository(),
+        repoFactory.getMonitoringDaysRepository()
+    );
 
-        // -----------------------------
-        // 2. Монітори
-        // -----------------------------
-        cpuMonitor = new CpuMonitor(cpuLabel, repoFactory.getProcessorRepository());
-        memoryMonitor = new MemoryMonitor(memoryLabel, repoFactory.getMemoryRepository());
-        usageMonitor = new ComputerUsageMonitor(usageLabel, repoFactory.getComputerUsageRepository());
-        windowMonitor = new WindowMonitor(windowLabel, repoFactory.getWindowRepository());
 
-        keyboardMonitor = new KeyboardMonitor(keyboardLabel);
-        mouseMonitor = new MouseMonitor(mouseLabel);
+    keyboardMonitor = new KeyboardMonitor(keyboardLabel);
+    mouseMonitor = new MouseMonitor(mouseLabel);
+
+    // -----------------------------
+    // 3. ТІЛЬКИ ТЕПЕР реєструємо HOOK-и
+    // -----------------------------
+    try {
+        GlobalScreen.registerNativeHook();
+
+        GlobalScreen.addNativeKeyListener(keyboardMonitor);
+        GlobalScreen.addNativeMouseListener(mouseMonitor);
+        GlobalScreen.addNativeMouseMotionListener(mouseMonitor);
+
+    } catch (NativeHookException e) {
+        System.err.println("Failed to register native hook: " + e.getMessage());
+    }
 
         // -----------------------------
         // 3. GUI

@@ -3,5 +3,6 @@ package ua.nychyk.activitymonitor.patterns.visitors;
 import java.util.Map;
 
 public interface ReportVisitor {
-    Object process(Map<String, Object> data);
+    Object visitDailyReport(Map<String, Object> data);
+    Object visitPeriodicReport(Map<String, Object> data);
 }

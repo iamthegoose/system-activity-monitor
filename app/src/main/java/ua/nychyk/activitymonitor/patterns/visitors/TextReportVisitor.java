@@ -5,14 +5,18 @@ import java.util.Map;
 public class TextReportVisitor implements ReportVisitor {
 
     @Override
-    public Object process(Map<String, Object> data) {
+    public Object visitDailyReport(Map<String, Object> data) {
         StringBuilder sb = new StringBuilder();
-        sb.append("=== TEXT REPORT ===\n");
-        
-        data.forEach((key, value) -> 
-            sb.append(key).append(": ").append(value).append("\n")
-        );
+        sb.append("=== DAILY REPORT ===\n");
+        data.forEach((k, v) -> sb.append(k).append(": ").append(v).append("\n"));
+        return sb.toString();
+    }
 
+    @Override
+    public Object visitPeriodicReport(Map<String, Object> data) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== PERIODIC REPORT ===\n");
+        data.forEach((k, v) -> sb.append(k).append(": ").append(v).append("\n"));
         return sb.toString();
     }
 }

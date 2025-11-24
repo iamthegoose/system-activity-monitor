@@ -3,59 +3,61 @@ package ua.nychyk.activitymonitor.monitors;
 import javafx.application.Platform;
 import javafx.scene.control.Label;
 
-import com.github.kwhat.jnativehook.GlobalScreen;
-import com.github.kwhat.jnativehook.NativeHookException;
 import com.github.kwhat.jnativehook.keyboard.NativeKeyEvent;
 import com.github.kwhat.jnativehook.keyboard.NativeKeyListener;
+
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class KeyboardMonitor implements ActivityAwareMonitor, NativeKeyListener {
 
     private final Label guiLabel;
-    private volatile boolean active = false;
+
+    // Замість lastKey → тепер набір натиснутих клавіш
+    private final Set<String> pressedKeys = ConcurrentHashMap.newKeySet();
 
     public KeyboardMonitor(Label guiLabel) {
         this.guiLabel = guiLabel;
-
-        try {
-            GlobalScreen.registerNativeHook();
-            GlobalScreen.addNativeKeyListener(this);
-        } catch (NativeHookException e) {
-            System.err.println("JNativeHook failed: " + e.getMessage());
-        }
     }
 
     @Override
     public boolean getActivityFlag() {
-        return active;
+        return !pressedKeys.isEmpty();
     }
 
     @Override
-    public void checkActivity(boolean isActive) {
-        this.active = isActive;
-    }
+    public void checkActivity(boolean ignored) {}
 
     @Override
     public void updateWidget() {
-        Platform.runLater(() ->
-                guiLabel.setText("Keyboard Activity: " + (active ? "Active" : "Idle"))
+        String keysText = pressedKeys.isEmpty()
+                ? "None"
+                : String.join(", ", pressedKeys);
+
+        String text = String.format(
+                "Keyboard pressed: %s   |   %s",
+                keysText,
+                pressedKeys.isEmpty() ? "Idle" : "Active"
         );
-        active = false; // RESET
-    }
 
-
-    @Override
-    public void saveData() { }
-
-    // ---------------- KEYBOARD LISTENER ----------------
-
-    @Override
-    public void nativeKeyPressed(NativeKeyEvent nativeKeyEvent) {
-        active = true;
+        Platform.runLater(() -> guiLabel.setText(text));
     }
 
     @Override
-    public void nativeKeyReleased(NativeKeyEvent nativeKeyEvent) { }
+    public void saveData() {}
+
+    // -------------------- KEYBOARD EVENTS --------------------
 
     @Override
-    public void nativeKeyTyped(NativeKeyEvent nativeKeyEvent) { }
+    public void nativeKeyPressed(NativeKeyEvent e) {
+        pressedKeys.add(NativeKeyEvent.getKeyText(e.getKeyCode()));
+    }
+
+    @Override
+    public void nativeKeyReleased(NativeKeyEvent e) {
+        pressedKeys.remove(NativeKeyEvent.getKeyText(e.getKeyCode()));
+    }
+
+    @Override
+    public void nativeKeyTyped(NativeKeyEvent e) {}
 }

@@ -3,6 +3,7 @@ package ua.nychyk.activitymonitor.report;
 import ua.nychyk.activitymonitor.patterns.commands.Command;
 import ua.nychyk.activitymonitor.patterns.visitors.ReportVisitor;
 
+
 public class ReportInvoker {
 
     private Command command;
@@ -12,10 +13,8 @@ public class ReportInvoker {
     }
 
     public Object executeCommand(ReportVisitor visitor) {
-        if (command == null) {
-            System.out.println("No command set.");
-            return null;
-        }
+        if (command == null) return null;
         return command.execute(visitor);
     }
 }
+

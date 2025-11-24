@@ -7,7 +7,9 @@ public class Main extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        String dbFile = "db.sqlite"; // той самий, що в Python
+        String dbFile =  "db.sqlite";
+        System.out.println("DB PATH = " + dbFile);
+
         new ActivityMonitorController(primaryStage, dbFile);
     }
 

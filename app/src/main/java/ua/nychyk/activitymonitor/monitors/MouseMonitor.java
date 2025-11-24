@@ -3,71 +3,83 @@ package ua.nychyk.activitymonitor.monitors;
 import javafx.application.Platform;
 import javafx.scene.control.Label;
 
-import com.github.kwhat.jnativehook.GlobalScreen;
-import com.github.kwhat.jnativehook.NativeHookException;
 import com.github.kwhat.jnativehook.mouse.NativeMouseEvent;
 import com.github.kwhat.jnativehook.mouse.NativeMouseInputListener;
+
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MouseMonitor implements ActivityFlagMonitor, NativeMouseInputListener {
 
     private final Label guiLabel;
-    private volatile boolean active = false;
+
+    private volatile int mouseX = 0;
+    private volatile int mouseY = 0;
+
+    // утримувані кнопки
+    private final Set<String> pressedButtons = ConcurrentHashMap.newKeySet();
 
     public MouseMonitor(Label guiLabel) {
         this.guiLabel = guiLabel;
-
-        try {
-            GlobalScreen.registerNativeHook();
-            GlobalScreen.addNativeMouseListener(this);
-            GlobalScreen.addNativeMouseMotionListener(this);
-        } catch (NativeHookException e) {
-            System.err.println("JNativeHook failed: " + e.getMessage());
-        }
     }
 
     @Override
     public boolean getActivityFlag() {
-        return active;
+        return !pressedButtons.isEmpty();
     }
 
     @Override
     public void updateWidget() {
-        Platform.runLater(() ->
-                guiLabel.setText("Mouse Activity: " + (active ? "Active" : "Idle"))
+        String buttons = pressedButtons.isEmpty()
+                ? "None"
+                : String.join(", ", pressedButtons);
+
+        String text = String.format(
+                "Mouse pos: (%d, %d)   |   Buttons: %s   |   %s",
+                mouseX, mouseY,
+                buttons,
+                pressedButtons.isEmpty() ? "Idle" : "Active"
         );
-        active = false; // RESET
-    }
 
-
-    @Override
-    public void saveData() {
-        // миша не записує дані в БД
-    }
-
-    // --------------------- LISTENER METHODS ---------------------
-
-    @Override
-    public void nativeMouseMoved(NativeMouseEvent nativeMouseEvent) {
-        active = true;
+        Platform.runLater(() -> guiLabel.setText(text));
     }
 
     @Override
-    public void nativeMouseDragged(NativeMouseEvent nativeMouseEvent) {
-        active = true;
+    public void saveData() {}
+
+    // -------------------- EVENTS --------------------
+
+    @Override
+    public void nativeMouseMoved(NativeMouseEvent e) {
+        mouseX = e.getX();
+        mouseY = e.getY();
     }
 
     @Override
-    public void nativeMouseClicked(NativeMouseEvent nativeMouseEvent) {
-        active = true;
+    public void nativeMouseDragged(NativeMouseEvent e) {
+        mouseX = e.getX();
+        mouseY = e.getY();
     }
 
     @Override
-    public void nativeMousePressed(NativeMouseEvent nativeMouseEvent) {
-        active = true;
+    public void nativeMousePressed(NativeMouseEvent e) {
+        pressedButtons.add(convertButton(e.getButton()));
     }
 
     @Override
-    public void nativeMouseReleased(NativeMouseEvent nativeMouseEvent) {
-        active = true;
+    public void nativeMouseReleased(NativeMouseEvent e) {
+        pressedButtons.remove(convertButton(e.getButton()));
+    }
+
+    @Override
+    public void nativeMouseClicked(NativeMouseEvent e) {}
+
+    private String convertButton(int b) {
+        return switch (b) {
+            case NativeMouseEvent.BUTTON1 -> "Left";
+            case NativeMouseEvent.BUTTON2 -> "Middle";
+            case NativeMouseEvent.BUTTON3 -> "Right";
+            default -> "Unknown";
+        };
     }
 }

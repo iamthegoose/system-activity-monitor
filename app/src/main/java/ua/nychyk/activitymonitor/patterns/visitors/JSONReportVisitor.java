@@ -8,7 +8,12 @@ public class JSONReportVisitor implements ReportVisitor {
     private final Gson gson = new Gson();
 
     @Override
-    public Object process(Map<String, Object> data) {
+    public Object visitDailyReport(Map<String, Object> data) {
+        return gson.toJson(data);
+    }
+
+    @Override
+    public Object visitPeriodicReport(Map<String, Object> data) {
         return gson.toJson(data);
     }
 }

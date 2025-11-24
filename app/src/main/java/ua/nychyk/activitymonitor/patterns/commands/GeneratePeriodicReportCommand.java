@@ -5,18 +5,13 @@ import ua.nychyk.activitymonitor.report.ReportService;
 
 public class GeneratePeriodicReportCommand implements Command {
 
-    private final ReportService reportService;
+    private final ReportService service;
     private final String start;
     private final String end;
     private final int reportType;
 
-    public GeneratePeriodicReportCommand(
-            ReportService reportService,
-            String start,
-            String end,
-            int reportType
-    ) {
-        this.reportService = reportService;
+    public GeneratePeriodicReportCommand(ReportService service, String start, String end, int reportType) {
+        this.service = service;
         this.start = start;
         this.end = end;
         this.reportType = reportType;
@@ -24,7 +19,7 @@ public class GeneratePeriodicReportCommand implements Command {
 
     @Override
     public Object execute(ReportVisitor visitor) {
-        var data = reportService.getPeriodicReport(start, end, reportType);
-        return visitor.process(data);
+        var data = service.getPeriodicReport(start, end, reportType);
+        return visitor.visitPeriodicReport(data);
     }
 }

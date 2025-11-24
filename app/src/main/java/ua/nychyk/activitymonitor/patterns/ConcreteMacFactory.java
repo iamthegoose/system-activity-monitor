@@ -24,7 +24,12 @@ public class ConcreteMacFactory implements MonitorFactory {
 
     @Override
     public MemoryMonitor createMemoryMonitor(String dbFile, Label guiLabel) {
-        return new MemoryMonitor(guiLabel, repoFactory.getMemoryRepository());
+        return new MemoryMonitor(
+            guiLabel,
+            repoFactory.getMemoryRepository(),
+            repoFactory.getMonitoringDaysRepository()
+        );
+
     }
 
     @Override
@@ -44,6 +49,11 @@ public class ConcreteMacFactory implements MonitorFactory {
 
     @Override
     public WindowMonitor createWindowMonitor(String dbFile, Label guiLabel) {
-        return new WindowMonitor(guiLabel, repoFactory.getWindowRepository());
+        return new WindowMonitor(
+            guiLabel,
+            repoFactory.getWindowRepository(),
+            repoFactory.getMonitoringDaysRepository()
+        );
     }
 }
+
