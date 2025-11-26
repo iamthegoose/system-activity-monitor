@@ -1,0 +1,115 @@
+@startuml factory_controller
+title Activity Monitor – Factory + Controller + Iterator
+skinparam captionFontSize 28
+caption Рисунок 1.2 – Класи Factory, Controller та Iterator патернів 
+package "Controller" {
+    class ActivityMonitorController {
+        - cpuLabel: Label
+        - memoryLabel: Label
+        - windowLabel: Label
+        - usageLabel: Label
+        - keyboardLabel: Label
+        - mouseLabel: Label
+        - cpuMonitor: CpuMonitor
+        - memoryMonitor: MemoryMonitor
+        - windowMonitor: WindowMonitor
+        - usageMonitor: ComputerUsageMonitor
+        - keyboardMonitor: KeyboardMonitor
+        - mouseMonitor: MouseMonitor
+        - monitors: List<Monitor>
+        - isMonitoring: boolean
+        - dbFile: String
+        - reportService: ReportService
+        + ActivityMonitorController(stage: Stage, dbFile: String)
+        + startMonitoring()
+        + stop()
+        + openReportWindow(...)
+    }
+}
+
+package "Factory Pattern" {
+    interface MonitorFactory {
+        + createProcessorMonitor(dbFile: String, label: Label): CpuMonitor
+        + createMemoryMonitor(dbFile: String, label: Label): MemoryMonitor
+        + createMouseMonitor(label: Label): MouseMonitor
+        + createKeyboardMonitor(label: Label): KeyboardMonitor
+        + createComputerUsageMonitor(dbFile: String, label: Label): ComputerUsageMonitor
+        + createWindowMonitor(dbFile: String, label: Label): WindowMonitor
+    }
+
+    class ConcreteMacFactory {
+        - repoFactory: MonitorRepositoryFactory
+        + ConcreteMacFactory(dbFile: String)
+        + createProcessorMonitor(dbFile, label)
+        + createMemoryMonitor(dbFile, label)
+        + createMouseMonitor(label)
+        + createKeyboardMonitor(label)
+        + createComputerUsageMonitor(dbFile, label)
+        + createWindowMonitor(dbFile, label)
+    }
+
+    MonitorFactory <|.. ConcreteMacFactory
+}
+
+package "Iterator Pattern" {
+    class MonitorIterator {
+        - monitors: List<Monitor>
+        - index: int
+        + MonitorIterator(monitors: List<Monitor>)
+        + hasNext(): boolean
+        + next(): Monitor
+    }
+}
+
+package "Repositories" {
+    class MonitorRepositoryFactory {
+        - db: DatabaseManager
+        - processorRepository: ProcessorRepository
+        - memoryRepository: MemoryRepository
+        - computerUsageRepository: ComputerUsageRepository
+        - windowRepository: WindowRepository
+        - monitoringDaysRepository: MonitoringDaysRepository
+        + getProcessorRepository()
+        + getMemoryRepository()
+        + getComputerUsageRepository()
+        + getWindowRepository()
+        + getMonitoringDaysRepository()
+    }
+}
+
+package "Monitors" {
+    interface Monitor
+    class CpuMonitor
+    class MemoryMonitor
+    class MouseMonitor
+    class KeyboardMonitor
+    class ComputerUsageMonitor
+    class WindowMonitor
+}
+
+' -------------------------
+' RELATIONSHIPS
+' -------------------------
+
+' Controller creates monitors via Factory
+ActivityMonitorController --> MonitorFactory : uses
+
+' Factory creates monitors
+ConcreteMacFactory --> CpuMonitor
+ConcreteMacFactory --> MemoryMonitor
+ConcreteMacFactory --> MouseMonitor
+ConcreteMacFactory --> KeyboardMonitor
+ConcreteMacFactory --> ComputerUsageMonitor
+ConcreteMacFactory --> WindowMonitor
+
+' Factory uses repository factory
+ConcreteMacFactory --> MonitorRepositoryFactory
+
+' Controller aggregates monitors
+ActivityMonitorController o-- Monitor
+
+' Iterator works over monitors
+MonitorIterator --> Monitor : iterates
+ActivityMonitorController --> MonitorIterator : creates
+
+@enduml

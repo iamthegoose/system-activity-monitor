@@ -1,0 +1,60 @@
+@startuml db
+!theme plain
+skinparam captionFontSize 24
+caption Рисунок 2.1 – Структура бази даних для збереження даних моніторингу
+entity "MonitoringDays" as MonitoringDays {
+  * date_id : INT <<PK>>
+  --
+  date : DATE
+}
+
+entity "ProcessorUsage" as ProcessorUsage {
+  * procusage_id : INT <<PK>>
+  --
+  date_id : INT <<FK>>
+  timestamp : TIME
+  cpu_usage : FLOAT
+}
+
+entity "MemoryUsage" as MemoryUsage {
+  * memusage_id : INT <<PK>>
+  --
+  date_id : INT <<FK>>
+  timestamp : TIME
+  used_mb : INT
+  total_memory : INT
+}
+
+entity "ComputerUsage" as ComputerUsage {
+  * compusage_id : INT <<PK>>
+  --
+  date_id : INT <<FK>>
+  time : TIME
+  active_seconds : INT
+}
+
+entity "Windows" as Windows {
+  * window_id : INT <<PK>>
+  --
+  name : VARCHAR
+}
+
+entity "WindowUsage" as WindowUsage {
+  * winusage_id : INT <<PK>>
+  --
+  date_id : INT <<FK>>
+  window_id : INT <<FK>>
+  time : TIME
+  active_seconds : INT
+}
+
+' -------------------- RELATIONSHIPS --------------------
+
+MonitoringDays ||--o{ ProcessorUsage : "1 to many"
+MonitoringDays ||--o{ MemoryUsage : "1 to many"
+MonitoringDays ||--o{ ComputerUsage : "1 to many"
+MonitoringDays ||--o{ WindowUsage : "1 to many"
+
+Windows ||--o{ WindowUsage : "1 to many"
+
+@enduml

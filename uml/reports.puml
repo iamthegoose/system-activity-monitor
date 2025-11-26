@@ -1,0 +1,87 @@
+@startuml reports
+title Reporting Subsystem – Commands + Visitors + ReportService
+skinparam captionFontSize 28
+caption Рисунок 1.5 – Система звітів з використанням патернів Command та Visitor
+' ----------------------------
+' REPORT SERVICE
+' ----------------------------
+package "Report Logic" {
+
+    class ReportService {
+        - processorRepo: ProcessorRepository
+        - memoryRepo: MemoryRepository
+        - usageRepo: ComputerUsageRepository
+        - windowRepo: WindowRepository
+        - daysRepo: MonitoringDaysRepository
+
+        + ReportService(...)
+        + getDailyReport(day: String, type: int): Map<String, Object>
+        + getPeriodicReport(start: String, end: String, type: int): Map<String, Object>
+    }
+}
+
+' ----------------------------
+' COMMAND PATTERN
+' ----------------------------
+package "Command Pattern" {
+
+    interface Command {
+        + execute(visitor: ReportVisitor): Object
+    }
+
+    class GenerateDailyReportCommand {
+        - service: ReportService
+        - day: String
+        - reportType: int
+        + GenerateDailyReportCommand(service, day, reportType)
+        + execute(visitor: ReportVisitor): Object
+    }
+
+    class GeneratePeriodicReportCommand {
+        - service: ReportService
+        - start: String
+        - end: String
+        - reportType: int
+        + GeneratePeriodicReportCommand(service, start, end, reportType)
+        + execute(visitor: ReportVisitor): Object
+    }
+
+    Command <|.. GenerateDailyReportCommand
+    Command <|.. GeneratePeriodicReportCommand
+
+    GenerateDailyReportCommand --> ReportService
+    GeneratePeriodicReportCommand --> ReportService
+}
+
+' ----------------------------
+' VISITOR PATTERN
+' ----------------------------
+package "Visitor Pattern" {
+
+    interface ReportVisitor {
+        + visitDailyReport(data: Map<String, Object>): Object
+        + visitPeriodicReport(data: Map<String, Object>): Object
+    }
+
+    class TextReportVisitor {
+        + visitDailyReport(data)
+        + visitPeriodicReport(data)
+    }
+
+    class JSONReportVisitor {
+        - gson
+        + visitDailyReport(data)
+        + visitPeriodicReport(data)
+    }
+
+    ReportVisitor <|.. TextReportVisitor
+    ReportVisitor <|.. JSONReportVisitor
+}
+
+' ----------------------------
+' COMMAND → VISITOR RELATION
+' ----------------------------
+GenerateDailyReportCommand --> ReportVisitor : uses
+GeneratePeriodicReportCommand --> ReportVisitor : uses
+
+@enduml

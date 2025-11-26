@@ -108,8 +108,6 @@ public class TextReportVisitor implements ReportVisitor {
         return sb.toString();
     }
 
-    // HELPERS
-
 
     private void formatCpuOrMemory(StringBuilder sb, Map<String, Object> byDay) {
         for (var entry : byDay.entrySet()) {

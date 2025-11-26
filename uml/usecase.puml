@@ -1,0 +1,49 @@
+@startuml usecase
+left to right direction
+
+skinparam captionFontSize 28
+caption Рисунок 1.1 – UseCase діаграма для монітору активності системи
+
+actor "Користувач" as User
+
+rectangle "Монітор активності\nсистеми" as System {
+
+  ' --- дії користувача ---
+  usecase "Перегляд поточних\nсистемних показників" as UC_View
+  usecase "Генерування звітів" as UC_Reports
+
+  ' --- робота з БД ---
+  usecase "Збереження даних\nдо бази даних" as UC_Save
+  usecase "Читання даних\nз бази даних" as UC_Load
+
+  ' --- монітори ---
+  usecase "Збір даних про\nнавантаження на процесор" as UC_CPU
+  usecase "Збір даних про\nвикористання оперативної пам'яті" as UC_RAM
+  usecase "Збір даних про\nактивні вікна та\nїх тривалість" as UC_Win
+  usecase "Збір даних про\nнатискання клавіш\nна клавіатурі" as UC_KB
+  usecase "Збір даних про\nактивність миші" as UC_Mouse
+}
+
+' --- взаємодія користувача ---
+User --> UC_View
+User --> UC_Reports
+
+' --- перегляд включає читання ---
+UC_View ..> UC_Load : <<include>>
+
+' --- звіти включають читання ---
+UC_Reports ..> UC_Load : <<include>>
+
+' --- монітори, що зберігають дані ---
+UC_CPU ..> UC_Save : <<include>>
+UC_RAM ..> UC_Save : <<include>>
+UC_Win ..> UC_Save : <<include>>
+
+' --- монітори, що тільки відображаються ---
+UC_CPU  ..> UC_View : <<include>>
+UC_RAM  ..> UC_View : <<include>>
+UC_Win  ..> UC_View : <<include>>
+UC_KB   ..> UC_View : <<include>>
+UC_Mouse ..> UC_View : <<include>>
+
+@enduml

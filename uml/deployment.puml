@@ -1,0 +1,30 @@
+@startuml deployment
+
+skinparam shadowing false
+skinparam handwritten false
+skinparam nodeStyle rectangle
+skinparam packageStyle rectangle
+skinparam captionFontSize 28
+caption Рисунок 1.6 – Діаграма розгортання системи моніторингу активності
+node "<<device>>\nClient Computer" as Client {
+
+    node "System monitor app\n(JavaFX application)" as App {
+        component "Processor Monitor"
+        component "Memory Monitor"
+        component "Window Monitor"
+        component "Computer Usage Monitor"
+        component "Keyboard Monitor"
+        component "Mouse Monitor"
+
+        component "ReportService"
+        component "Command + Visitor\n(report generation)"
+    }
+
+    node "SQLite DB" as DB
+}
+
+node "Operating System\n(macOS)" as OS
+
+App --> OS : system calls\n(CPU, RAM,\nactive windows,\nkeyboard, mouse)
+App --> DB : file interface\n(read/write SQLite)
+@enduml

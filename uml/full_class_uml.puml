@@ -1,0 +1,367 @@
+@startuml full_class_uml
+
+' ===============================
+'      CONTROLLER / MAIN GUI
+' ===============================
+
+class ActivityMonitorController {
+    - cpuLabel : Label
+    - memoryLabel : Label
+    - windowLabel : Label
+    - usageLabel : Label
+    - keyboardLabel : Label
+    - mouseLabel : Label
+
+    - cpuMonitor : CpuMonitor
+    - memoryMonitor : MemoryMonitor
+    - windowMonitor : WindowMonitor
+    - usageMonitor : ComputerUsageMonitor
+    - keyboardMonitor : KeyboardMonitor
+    - mouseMonitor : MouseMonitor
+
+    - monitors : List<Monitor>
+    - isMonitoring : boolean
+    - dbFile : String
+    - reportService : ReportService
+
+    + ActivityMonitorController(stage : Stage, dbFile : String)
+    + startMonitoring() : void
+    + stop() : void
+    + openReportWindow(parentStage : Stage) : void
+}
+
+' ===============================
+'          MONITOR FACTORY
+' ===============================
+
+interface MonitorFactory {
+    + createProcessorMonitor(dbFile : String, label : Label) : CpuMonitor
+    + createMemoryMonitor(dbFile : String, label : Label) : MemoryMonitor
+    + createMouseMonitor(label : Label) : MouseMonitor
+    + createKeyboardMonitor(label : Label) : KeyboardMonitor
+    + createComputerUsageMonitor(dbFile : String, label : Label) : ComputerUsageMonitor
+    + createWindowMonitor(dbFile : String, label : Label) : WindowMonitor
+}
+
+class ConcreteMacFactory {
+    - repoFactory : MonitorRepositoryFactory
+
+    + ConcreteMacFactory(dbFile : String)
+    + createProcessorMonitor(dbFile : String, label : Label) : CpuMonitor
+    + createMemoryMonitor(dbFile : String, label : Label) : MemoryMonitor
+    + createMouseMonitor(label : Label) : MouseMonitor
+    + createKeyboardMonitor(label : Label) : KeyboardMonitor
+    + createComputerUsageMonitor(dbFile : String, label : Label) : ComputerUsageMonitor
+    + createWindowMonitor(dbFile : String, label : Label) : WindowMonitor
+}
+
+MonitorFactory <|.. ConcreteMacFactory
+
+class MonitorIterator {
+    - monitors : List<Monitor>
+    - index : int
+
+    + MonitorIterator(monitors : List<Monitor>)
+    + hasNext() : boolean
+    + next() : Monitor
+}
+
+' ===============================
+'           MONITORS
+' ===============================
+
+interface Monitor {
+    + updateWidget() : void
+    + saveData() : void
+    + getActivityFlag() : boolean
+}
+
+interface ActivityAwareMonitor extends Monitor {
+    + checkActivity(isActive : boolean) : void
+}
+
+class CpuMonitor {
+    - guiLabel : Label
+    - repo : ProcessorRepository
+
+    + CpuMonitor(guiLabel : Label, repo : ProcessorRepository)
+    + updateWidget() : void
+    + saveData() : void
+    + getActivityFlag() : boolean
+}
+
+class MemoryMonitor {
+    - guiLabel : Label
+    - memoryRepo : MemoryRepository
+    - daysRepo : MonitoringDaysRepository
+
+    + MemoryMonitor(guiLabel : Label, memoryRepo : MemoryRepository, daysRepo : MonitoringDaysRepository)
+    + updateWidget() : void
+    + saveData() : void
+    + getActivityFlag() : boolean
+    - getMacMemory() : MemoryInfo
+}
+
+class WindowMonitor {
+    - guiLabel : Label
+    - windowRepo : WindowRepository
+    - daysRepo : MonitoringDaysRepository
+    - lastWindow : String
+    - activeSeconds : int
+
+    + WindowMonitor(guiLabel : Label, windowRepo : WindowRepository, daysRepo : MonitoringDaysRepository)
+    + updateWidget() : void
+    + saveData() : void
+    + getActivityFlag() : boolean
+    + checkActivity(isActive : boolean) : void
+}
+
+class ComputerUsageMonitor {
+    - guiLabel : Label
+    - repo : ComputerUsageRepository
+    - activeSeconds : int
+
+    + ComputerUsageMonitor(guiLabel : Label, repo : ComputerUsageRepository)
+    + updateWidget() : void
+    + saveData() : void
+    + getActivityFlag() : boolean
+    + checkActivity(isActive : boolean) : void
+}
+
+class KeyboardMonitor {
+    - guiLabel : Label
+    - keyCount : int
+
+    + KeyboardMonitor(guiLabel : Label)
+    + nativeKeyPressed() : void
+    + nativeKeyReleased() : void
+    + updateWidget() : void
+    + saveData() : void
+    + getActivityFlag() : boolean
+}
+
+class MouseMonitor {
+    - guiLabel : Label
+    - clickCount : int
+    - moveCount : int
+
+    + MouseMonitor(guiLabel : Label)
+    + nativeMouseClicked() : void
+    + nativeMouseMoved() : void
+    + updateWidget() : void
+    + saveData() : void
+    + getActivityFlag() : boolean
+}
+
+Monitor <|.. ActivityAwareMonitor
+
+Monitor <|.. CpuMonitor
+Monitor <|.. MemoryMonitor
+Monitor <|.. KeyboardMonitor
+Monitor <|.. MouseMonitor
+
+ActivityAwareMonitor <|.. WindowMonitor
+ActivityAwareMonitor <|.. ComputerUsageMonitor
+
+CpuMonitor --> ProcessorRepository
+MemoryMonitor --> MemoryRepository
+MemoryMonitor --> MonitoringDaysRepository
+WindowMonitor --> WindowRepository
+WindowMonitor --> MonitoringDaysRepository
+ComputerUsageMonitor --> ComputerUsageRepository
+
+' ===============================
+'            REPOSITORIES
+' ===============================
+
+class DatabaseManager {
+    - dbFile : String
+
+    + DatabaseManager(dbFile : String)
+    + getConnection() : Connection
+    - createTables() : void
+}
+
+class ProcessorRepository {
+    - db : DatabaseManager
+
+    + ProcessorRepository(db : DatabaseManager)
+    + saveCpuUsage(dateId : int, timestamp : String, cpuUsage : double) : void
+    + saveCpuUsage(cpuUsage : double) : void
+    + getUsageByDay(dateId : int) : List<Map<String,Object>>
+    + getAverageUsage(dateIds : List<Integer>) : double
+}
+
+class MemoryRepository {
+    - db : DatabaseManager
+
+    + MemoryRepository(db : DatabaseManager)
+    + insertMemoryUsage(dateId : int, timestamp : String, usedMb : int) : void
+    + insertMemoryUsage(usedMb : int) : void
+    + getUsageByDay(dateId : int) : List<Map<String,Object>>
+    + getAverageUsage(dateIds : List<Integer>) : double
+}
+
+class ComputerUsageRepository {
+    - db : DatabaseManager
+
+    + ComputerUsageRepository(db : DatabaseManager)
+    + saveComputerUsage(dateId : int, time : String) : void
+    + saveComputerUsage(activeSeconds : int) : void
+    + getDailyUptime(dateId : int) : int
+}
+
+class WindowRepository {
+    - db : DatabaseManager
+
+    + WindowRepository(db : DatabaseManager)
+    + saveWindowUsage(dateId : int, windowId : int, addedTime : String) : void
+    + getOrAddWindowId(windowName : String) : int
+    + getUsageByDay(dateId : int) : List<Map<String,Object>>
+    + getDistinctWindows(dateId : int) : List<String>
+}
+
+class MonitoringDaysRepository {
+    - db : DatabaseManager
+
+    + MonitoringDaysRepository(db : DatabaseManager)
+    + getOrAddDateId(date : String) : int
+    + getDateId(date : String) : Integer
+    + getDateRange(start : String, end : String) : List<Integer>
+}
+
+DatabaseManager <-- ProcessorRepository
+DatabaseManager <-- MemoryRepository
+DatabaseManager <-- ComputerUsageRepository
+DatabaseManager <-- WindowRepository
+DatabaseManager <-- MonitoringDaysRepository
+
+class MonitorRepositoryFactory {
+    - db : DatabaseManager
+    - processorRepository : ProcessorRepository
+    - memoryRepository : MemoryRepository
+    - computerUsageRepository : ComputerUsageRepository
+    - windowRepository : WindowRepository
+    - monitoringDaysRepository : MonitoringDaysRepository
+
+    + MonitorRepositoryFactory(dbFile : String)
+    + getProcessorRepository() : ProcessorRepository
+    + getMemoryRepository() : MemoryRepository
+    + getComputerUsageRepository() : ComputerUsageRepository
+    + getWindowRepository() : WindowRepository
+    + getMonitoringDaysRepository() : MonitoringDaysRepository
+}
+
+MonitorRepositoryFactory --> DatabaseManager
+MonitorRepositoryFactory --> ProcessorRepository
+MonitorRepositoryFactory --> MemoryRepository
+MonitorRepositoryFactory --> ComputerUsageRepository
+MonitorRepositoryFactory --> WindowRepository
+MonitorRepositoryFactory --> MonitoringDaysRepository
+
+' ===============================
+'          REPORTING / CMD / VISITOR
+' ===============================
+
+class ReportService {
+    - processorRepo : ProcessorRepository
+    - memoryRepo : MemoryRepository
+    - usageRepo : ComputerUsageRepository
+    - windowRepo : WindowRepository
+    - daysRepo : MonitoringDaysRepository
+
+    + ReportService(processorRepo : ProcessorRepository,
+                    memoryRepo : MemoryRepository,
+                    usageRepo : ComputerUsageRepository,
+                    windowRepo : WindowRepository,
+                    daysRepo : MonitoringDaysRepository)
+
+    + getDailyReport(day : String, type : int) : Map<String,Object>
+    + getPeriodicReport(start : String, end : String, type : int) : Map<String,Object>
+}
+
+ReportService --> ProcessorRepository
+ReportService --> MemoryRepository
+ReportService --> ComputerUsageRepository
+ReportService --> WindowRepository
+ReportService --> MonitoringDaysRepository
+
+interface Command {
+    + execute(visitor : ReportVisitor) : Object
+}
+
+class GenerateDailyReportCommand {
+    - service : ReportService
+    - day : String
+    - reportType : int
+
+    + GenerateDailyReportCommand(service : ReportService, day : String, reportType : int)
+    + execute(visitor : ReportVisitor) : Object
+}
+
+class GeneratePeriodicReportCommand {
+    - service : ReportService
+    - start : String
+    - end : String
+    - reportType : int
+
+    + GeneratePeriodicReportCommand(service : ReportService, start : String, end : String, reportType : int)
+    + execute(visitor : ReportVisitor) : Object
+}
+
+Command <|.. GenerateDailyReportCommand
+Command <|.. GeneratePeriodicReportCommand
+
+GenerateDailyReportCommand --> ReportService
+GeneratePeriodicReportCommand --> ReportService
+
+interface ReportVisitor {
+    + visitDailyReport(data : Map<String,Object>) : Object
+    + visitPeriodicReport(data : Map<String,Object>) : Object
+}
+
+class TextReportVisitor {
+    + visitDailyReport(data : Map<String,Object>) : Object
+    + visitPeriodicReport(data : Map<String,Object>) : Object
+}
+
+class JSONReportVisitor {
+    - gson
+
+    + JSONReportVisitor()
+    + visitDailyReport(data : Map<String,Object>) : Object
+    + visitPeriodicReport(data : Map<String,Object>) : Object
+}
+
+ReportVisitor <|.. TextReportVisitor
+ReportVisitor <|.. JSONReportVisitor
+
+GenerateDailyReportCommand --> ReportVisitor
+GeneratePeriodicReportCommand --> ReportVisitor
+
+' ===============================
+'       HIGH-LEVEL RELATIONS
+' ===============================
+
+ActivityMonitorController --> CpuMonitor
+ActivityMonitorController --> MemoryMonitor
+ActivityMonitorController --> WindowMonitor
+ActivityMonitorController --> ComputerUsageMonitor
+ActivityMonitorController --> KeyboardMonitor
+ActivityMonitorController --> MouseMonitor
+
+ActivityMonitorController --> MonitorIterator
+ActivityMonitorController --> ReportService
+ActivityMonitorController --> MonitorRepositoryFactory
+
+ConcreteMacFactory --> MonitorRepositoryFactory
+ConcreteMacFactory --> CpuMonitor
+ConcreteMacFactory --> MemoryMonitor
+ConcreteMacFactory --> MouseMonitor
+ConcreteMacFactory --> KeyboardMonitor
+ConcreteMacFactory --> ComputerUsageMonitor
+ConcreteMacFactory --> WindowMonitor
+
+MonitorIterator --> Monitor
+
+@enduml

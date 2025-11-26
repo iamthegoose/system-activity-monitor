@@ -1,0 +1,52 @@
+@startuml repo
+
+skinparam classAttributeIconSize 0
+skinparam captionFontSize 28
+caption Рисунок 1.4 – Репозиторії для збереження даних моніторингу
+
+package "Repositories" {
+
+    class ProcessorRepository {
+        - db: DatabaseManager
+        + ProcessorRepository(db: DatabaseManager)
+        + saveCpuUsage(dateId: int, timestamp: String, cpuUsage: double): void
+        + saveCpuUsage(cpuUsage: double): void
+        + getUsageByDay(dateId: int): List<Map<String,Object>>
+        + getAverageUsage(dateIds: List<Integer>): double
+    }
+
+    class MemoryRepository {
+        - db: DatabaseManager
+        + MemoryRepository(db: DatabaseManager)
+        + insertMemoryUsage(dateId: int, timestamp: String, usedMb: int): void
+        + insertMemoryUsage(usedMb: int): void
+        + getUsageByDay(dateId: int): List<Map<String,Object>>
+        + getAverageUsage(dateIds: List<Integer>): double
+    }
+
+    class ComputerUsageRepository {
+        - db: DatabaseManager
+        + ComputerUsageRepository(db: DatabaseManager)
+        + saveComputerUsage(dateId: int, time: String): void
+        + saveComputerUsage(activeSeconds: int): void
+        + getDailyUptime(dateId: int): int
+    }
+
+    class WindowRepository {
+        - db: DatabaseManager
+        + WindowRepository(db: DatabaseManager)
+        + saveWindowUsage(dateId: int, windowId: int, addedTime: String): void
+        + getOrAddWindowId(windowName: String): int
+        + getUsageByDay(dateId: int): List<Map<String,Object>>
+        + getDistinctWindows(dateId: int): List<String>
+    }
+    class MonitoringDaysRepository {
+    - db: DatabaseManager
+    + MonitoringDaysRepository(db: DatabaseManager)
+    + getOrAddDateId(date: String): int
+    + getDateId(date: String): Integer
+    + getDateRange(start: String, end: String): List<Integer>
+    }
+}
+
+@enduml
